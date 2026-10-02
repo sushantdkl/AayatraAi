@@ -1,0 +1,10 @@
+.commercial-row > .commercial-action { grid-column: 1 / -1; display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.commercial-row > .commercial-action label, .commercial-policy-approval label { display: grid; gap: 5px; min-width: 180px; flex: 1; font-size: 12px; font-weight: 650; color: var(--ink); }
+.commercial-row > .commercial-action input, .commercial-policy-approval input { width: 100%; min-height: 37px; border: 1px solid #d6e1d9; border-radius: 6px; background: #fff; color: var(--ink); padding: 8px 10px; font-size: 12px; }
+.commercial-row > .commercial-action input:focus-visible, .commercial-policy-approval input:focus-visible { border-color: var(--accent); outline: 2px solid var(--accent-soft); outline-offset: 1px; }
+.commercial-policy-approval { display: flex; align-items: end; gap: 12px; padding: 0 20px 20px; flex-wrap: wrap; }
+.commercial-policy-approval .button { min-height: 37px; }
+@media (max-width: 670px) { .commercial-policy-approval { padding: 0 15px 15px; } }
+.synthetic-attestation { display: grid; gap: 5px; flex: 1 1 260px; color: var(--ink); font-size: 12px; font-weight: 650; }
+.synthetic-attestation input { width: 100%; min-height: 37px; border: 1px solid #d6e1d9; border-radius: 6px; padding: 8px 10px; color: var(--ink); background: #fff; font-size: 12px; }
+.synthetic-attestation input:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 1px; border-color: var(--accent); }

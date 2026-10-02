@@ -1,0 +1,101 @@
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.template-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #17674b;
+  font-size: 12px;
+  font-weight: 650;
+  margin: 4px 0 12px;
+  text-decoration: none;
+}
+.template-link:hover {
+  text-decoration: underline;
+}
+.import-preview {
+  margin-top: 25px;
+  border-top: 1px solid #e4eae6;
+  padding-top: 18px;
+}
+.import-preview h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.import-counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid #e4eae6;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.import-counts span {
+  padding: 11px;
+  text-align: center;
+  border-right: 1px solid #e4eae6;
+  color: #6e7d78;
+  font-size: 11px;
+}
+.import-counts span:last-child {
+  border: 0;
+}
+.import-counts strong {
+  display: block;
+  color: #142724;
+  font-size: 19px;
+}
+.import-issues {
+  margin-top: 12px;
+  max-height: 240px;
+  overflow: auto;
+  background: #fff6f1;
+  border: 1px solid #f2dacb;
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+.import-issues p {
+  padding: 7px 0;
+  border-bottom: 1px solid #efded3;
+  margin: 0;
+  font-size: 11px;
+}
+.import-issues p:last-child {
+  border: 0;
+}
+.import-issues strong,
+.import-issues span {
+  display: block;
+}
+.import-issues span {
+  color: #a44c38;
+  margin-top: 2px;
+}
+.import-ready {
+  padding: 14px;
+  background: #e8f2e9;
+  border: 1px solid #d4e8d6;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #336349;
+}
+.import-ready p {
+  margin: 3px 0 0;
+  color: #5c7a65;
+}
+@media (max-width: 670px) {
+  .heading-actions {
+    gap: 5px;
+  }
+  .heading-actions .button {
+    font-size: 10px;
+    padding: 0 7px;
+  }
+  .heading-actions .button svg {
+    width: 13px;
+    height: 13px;
+  }
+}

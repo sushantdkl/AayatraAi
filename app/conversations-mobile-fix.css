@@ -1,0 +1,29 @@
+.inbox-workspace,
+.inbox-toolbar,
+.inbox-filters,
+.inbox-create,
+.inbox-grid {
+  min-width: 0;
+  max-width: 100%;
+}
+.inbox-create select {
+  min-width: 0;
+}
+.inbox-thread .inbox-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.inbox-thread .inbox-controls .button {
+  height: 31px;
+}
+.inbox-list-row > span,
+.inbox-list-row small,
+.inbox-message span,
+.inbox-context-body span,
+.inbox-disclaimer {
+  color: var(--muted);
+  font-size: 11px;
+}

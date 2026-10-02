@@ -1,0 +1,30 @@
+.stage-history {
+  margin: 20px 0;
+  border-top: 1px solid #e4eae6;
+  padding-top: 18px;
+}
+.stage-history h3 {
+  margin: 0 0 9px;
+  font-size: 12px;
+}
+.stage-history > div {
+  border-bottom: 1px solid #edf1ee;
+  padding: 9px 0;
+}
+.stage-history > div:last-child {
+  border: 0;
+}
+.stage-history strong,
+.stage-history small {
+  display: block;
+}
+.stage-history strong {
+  font-size: 11px;
+}
+.stage-history small,
+.stage-history p {
+  font-size: 10px;
+  color: #73857a;
+  margin: 3px 0 0;
+  line-height: 1.5;
+}

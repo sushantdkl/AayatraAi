@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-01T00:00:00.000Z",
+  "title": "Design System: Aayatra Sales Engine",
+  "extensions": {
+    "colorMeta": {
+      "forest-sidebar": { "role": "primary", "displayName": "Forest Sidebar", "tonalRamp": ["#091511", "#10231d", "#152b27", "#25473c", "#426d5b", "#79a18b", "#b7d1c0", "#e8f3eb"] },
+      "action-green": { "role": "primary", "displayName": "Action Green", "tonalRamp": ["#062f26", "#094735", "#0d6b56", "#228c70", "#50aa8a", "#85c6a8", "#b9dfca", "#e5f3ed"] },
+      "ink": { "role": "neutral", "displayName": "Deep Ink", "tonalRamp": ["#0b1715", "#142724", "#334641", "#54655e", "#74847d", "#9ba8a0", "#c7d0c9", "#f0f3ef"] },
+      "canvas": { "role": "neutral", "displayName": "Quiet Canvas", "tonalRamp": ["#24312a", "#3d4d42", "#617467", "#8d9e91", "#b7c5b9", "#dbe4da", "#ebf0e9", "#f5f7f4"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Workspace headline", "purpose": "Primary page question or task." },
+      "body": { "displayName": "Working body", "purpose": "Records, descriptions, and forms." },
+      "label": { "displayName": "Operational label", "purpose": "Actions and compact metadata." }
+    },
+    "shadows": [],
+    "motion": [{ "name": "control-state", "value": "180ms ease", "purpose": "Small hover changes on controls only." }],
+    "breakpoints": [{ "name": "compressed-sidebar", "value": "900px" }, { "name": "horizontal-mobile-nav", "value": "670px" }]
+  },
+  "components": [
+    { "name": "Primary Button", "kind": "button", "refersTo": "button-primary", "description": "The single most important action in a local task.", "html": "<button class=\"ds-btn-primary\">Add lead</button>", "css": ".ds-btn-primary{height:36px;padding:0 14px;border:1px solid transparent;border-radius:7px;background:var(--accent,#0d6b56);color:#fff;font:680 12px ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:background .18s ease,transform .18s ease}.ds-btn-primary:hover{background:var(--accent-hover,#095944);transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:3px solid #57b797;outline-offset:2px}" },
+    { "name": "Secondary Button", "kind": "button", "refersTo": "button-secondary", "description": "Adjacent supporting action.", "html": "<button class=\"ds-btn-secondary\">Import CSV</button>", "css": ".ds-btn-secondary{height:36px;padding:0 14px;border:1px solid #cddbd0;border-radius:7px;background:#fff;color:#294a3d;font:680 12px ui-sans-serif,system-ui,sans-serif;cursor:pointer}.ds-btn-secondary:hover{background:#f3f8f3;border-color:#92baa2}.ds-btn-secondary:focus-visible{outline:3px solid #57b797;outline-offset:2px}" },
+    { "name": "Input", "kind": "input", "description": "Compact data-entry field.", "html": "<input class=\"ds-input\" aria-label=\"Business name\" placeholder=\"Business name\" />", "css": ".ds-input{width:100%;min-height:36px;padding:8px 10px;border:1px solid #d6e1d9;border-radius:6px;background:#fff;color:var(--ink,#142724);font:12px ui-sans-serif,system-ui,sans-serif}.ds-input:focus{border-color:#69ac83;outline:3px solid #57b797;outline-offset:2px}" },
+    { "name": "Navigation Item", "kind": "nav", "description": "Active section in forest navigation.", "html": "<button class=\"ds-nav\" aria-label=\"Overview\">Overview</button>", "css": ".ds-nav{min-height:42px;width:100%;padding:0 14px;border:0;border-radius:6px;background:#31574a;color:#fff;text-align:left;font:600 13px ui-sans-serif,system-ui,sans-serif}.ds-nav:hover{background:#3c6455}.ds-nav:focus-visible{outline:3px solid #57b797;outline-offset:2px}" },
+    { "name": "Status Badge", "kind": "chip", "description": "Compact, non-interactive stage status.", "html": "<span class=\"ds-badge\">HOT</span>", "css": ".ds-badge{display:inline-flex;padding:4px 8px;border-radius:5px;background:#fff1d9;color:#a56a1c;font:750 10px ui-sans-serif,system-ui,sans-serif;letter-spacing:.035em}" },
+    { "name": "Data Card", "kind": "card", "description": "Quiet bordered container for operational information.", "html": "<div class=\"ds-card\"><strong>Priority conversations</strong><p>Review the next action.</p></div>", "css": ".ds-card{padding:20px;border:1px solid var(--line,#e4eae6);border-radius:9px;background:var(--surface,#fff);color:var(--ink,#142724);font:14px ui-sans-serif,system-ui,sans-serif}.ds-card p{margin:8px 0 0;color:var(--muted,#6e7d78)}" }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Sales Desk",
+    "overview": "This is an internal operating surface, not a promotional landing page. Dark forest navigation anchors the product; pale paper-like work areas keep lead evidence, decisions, and next actions easy to scan.",
+    "keyCharacteristics": ["restrained green", "compact controls", "explicit provenance and status", "responsive data panels"],
+    "rules": [{ "name": "The Evidence Color Rule", "body": "A color must communicate navigation, action, or state; it must not imply a lead is verified when the underlying data is provisional.", "section": "colors" }],
+    "dos": ["Do show source, confidence, actor, and timing near research or stage decisions.", "Do preserve visible focus states and names for mobile icon controls.", "Do use restrained status color and plain-language copy."],
+    "donts": ["Don't make provisional fit or product suggestions look like verified facts.", "Don't use generic promotional gradients or decoration in core workflow screens.", "Don't hide a required next action inside a hover-only interaction."]
+  }
+}

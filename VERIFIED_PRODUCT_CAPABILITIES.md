@@ -1,93 +1,49 @@
-# Aayatra Verified Product Capability Matrix
+# Aayatra verified product capability matrix
 
-**As of:** 2026-10-01  
-**Verification result:** No capability is currently verified from repository evidence.
+**As of:** 2026-10-03 (owner configuration addendum)
+**Live register:** Settings → Feature claims (`product_features` table, append-only history in `product_feature_history`). This file describes the seeded state and the rules; the database is authoritative.
 
-## Status vocabulary
+## What changed with the addendum
 
-| Status | Meaning | May AI sell it? |
+- Company identity, PAN-only tax status and poster **prices** are confirmed by the owner.
+- Poster **feature claims are not**. Each sellable feature still needs source, test and live-demo evidence.
+- The actual restaurant source is the `dimsum` repository (Next.js 16, React 19, Node 22, PostgreSQL). The archive could not be uploaded (30 MB limit) and this session was not permitted to attach `sushantdkl/dimsum`, so **it has not been inspected here**. The source-audit tool below is ready to run on it.
+
+## Status vocabulary and AI policy (§16)
+
+| Implementation status | Seller / AI behaviour | Default commercial status |
 |---|---|---|
-| `VERIFIED` | Demonstrated in the named released version and approved by a product owner | Yes, within recorded limitations |
-| `OPTIONAL` | Available through an approved module or package with known price/requirements | Only as an option |
-| `BETA` | Implemented but not generally committed | Only with explicit human approval |
-| `PLANNED` | Roadmap item, not implemented | No |
-| `CUSTOM_REVIEW` | Feasibility, price, and schedule require review | No promise; escalate |
-| `UNSUPPORTED` | Explicitly unavailable | No |
-| `UNVERIFIED` | Mentioned without implementation evidence | No |
+| `VERIFIED_AVAILABLE` | Sell normally using the approved wording | SELLABLE |
+| `AVAILABLE_WITH_CONFIGURATION` | Sell and explain the conditions | SELLABLE |
+| `PARTIAL` | Disclose the limitation; human review | SELL_WITH_DISCLOSURE |
+| `BETA` | Never promise as a standard production feature; human | REVIEW_REQUIRED |
+| `PLANNED` | Never represent as available now | NOT_SALES_SAFE |
+| `CUSTOM_ONLY` | Technical/commercial review | REVIEW_REQUIRED |
+| `NOT_AVAILABLE` | Say it is unavailable | NOT_SALES_SAFE |
+| `UNKNOWN` | Do not guess: "let me confirm with the product team" | REVIEW_REQUIRED |
 
-`UNVERIFIED` is deliberately different from `UNSUPPORTED`. It protects the company from false claims while product discovery is incomplete.
+Database guards: `VERIFIED_AVAILABLE`/`AVAILABLE_WITH_CONFIGURATION` require `verified_by`, `verified_at` and approved wording; `SELLABLE` requires one of those two statuses. The API rejects any evidence that cites a poster, brochure or marketing material as verification.
 
-## Portfolio-level result
+## Seeded restaurant matrix (dimsum: Aadhar Restaurant POS/ERP)
 
-| Product family | Prompt-stated capability areas | Verified today | Sales rule |
-|---|---|---:|---|
-| Aadhar Restaurant Management | POS, KOT/kitchen, tables, payments, reservations, inventory, purchasing, accounting, reporting, permissions, local/offline options, website/ordering | 0 | Discovery only; do not claim individual features |
-| Hotel Management | Rooms, reservations, check-in/out, folios, housekeeping, reporting, website/direct booking, restaurant/banquet links | 0 | Discovery only |
-| Combined Hotel + Restaurant | Unified guest/restaurant workflows, room posting, inventory/accounting/reporting, booking, room service, banquet | 0 | Treat as an offer hypothesis, not a released integration |
-| Aadhar Retail ERP | POS, catalogue/variants/barcodes, pricing, stock, purchasing, suppliers, receivables, accounting, ecommerce, CRM | 0 | Discovery only |
-| The Haircut | Billing, queue, customers, appointments, stock, expenses, reporting, loyalty, membership, booking, HR | 0 | Discovery only |
-| Business Websites | Design/redesign, mobile, SEO basics, catalogue, booking, ordering, integrations | 0 | Scope and quote require review |
-| Ecommerce | Storefront, catalogue, inventory, customer workspace, payments/courier integrations | 0 | Scope and quote require review |
-| AI & Automation | Assistants, workflow/reporting automation, integrations, agents | 0 | Custom review mandatory |
-| Custom Software | Bespoke software and integrations | 0 standardized | Architecture, delivery, and commercial review mandatory |
+| Feature | Seeded status | Evidence recorded |
+|---|---|---|
+| POS, orders, billing, KOT, tables, reservations, online orders | UNKNOWN | Owner reports code evidence in dimsum; not audited in this environment |
+| Inventory, inventory movements, purchases, suppliers/AP, customers/AR, expenses | UNKNOWN | Same |
+| Cash book, business days, cash drawer, bank/reconciliation, accounting/GL | UNKNOWN | Same |
+| Reports/analytics, employees/HR, payroll, public website/menu/reviews | UNKNOWN | Same |
+| Offline mode, eSewa/Khalti/FonePay, mobile app | UNKNOWN | No evidence supplied |
+| **Multi-branch operation** | **NOT_AVAILABLE · NOT_SALES_SAFE** | Repository audit: no complete multi-tenant / `branch_id` model; future work. The Enterprise poster does not override this. |
+| **"IRD-approved / certified software" claim** | **NOT_AVAILABLE · NOT_SALES_SAFE** | No official software approval document. Company PAN registration is not product certification. |
 
-## Verification register template
+Retail (billing, barcode, inventory, customers, reports): UNKNOWN, no source supplied. Hotel, combined hotel + restaurant, The Haircut, websites, ecommerce, AI and custom work are company capabilities. The AI describes them only in general terms and always routes scope and price to a person.
 
-Each row must be completed for every capability before it becomes available to the sales agent.
+## How a feature becomes sellable
 
-| Field | Required content |
-|---|---|
-| Product / capability ID | Stable machine-readable identifiers |
-| Customer-facing name | Approved wording |
-| Status | One controlled value above |
-| Product version | Exact release/build or hosted release date |
-| Deployment modes | Cloud, on-premises, local network, offline behavior |
-| Preconditions | Hardware, licenses, connectivity, integrations, configuration |
-| Limitations | Scale, workflow, geography, browser/device, unsupported cases |
-| Evidence | Test case, demo URL, release note, manual, or production proof |
-| Evidence owner | Accountable product/engineering owner |
-| Commercial package | Package/SKU and approved price reference |
-| Support commitment | SLA/support/training/migration terms |
-| Approved language | What sales may say |
-| Prohibited language | Claims sales must not make |
-| Last verified / expires | Review dates |
-
-## Minimum verification test packs
-
-### Restaurant
-
-Verify end-to-end: order → KOT/kitchen → bill → split/settlement → business-day close; table transfer/merge; stock movement and costing; purchase/payable flow; audit/permissions; offline/local behavior and recovery; accounting journal behavior; supported reports; reservation/QR/online-ordering boundaries.
-
-### Hotel
-
-Verify: availability → reservation → check-in → folio charges → payment → check-out; room status/housekeeping; guest history and permissions; direct booking behavior; cancellation/no-show/overbooking controls; accounting/reporting; multi-property status; restaurant, room-service, and banquet boundaries.
-
-### Combined hotel + restaurant
-
-Verify: restaurant charge posted to the correct occupied room/folio; void/reversal; tax/service-charge behavior; guest identity; shared vs separate inventory; consolidated close and reporting; failure/retry behavior; permissions across departments.
-
-### Retail ERP
-
-Verify: product/variant/barcode → purchase/receipt → valuation → sale/return → stock and journals; promotions and multiple prices; credit/collection; batch/serial/quarantine boundaries; ecommerce stock synchronization; multi-store status; reports and permissions.
-
-### Salon
-
-Verify: booking/queue → service assignment → bill/payment → loyalty/package consumption; cancellation/no-show; staff commissions if claimed; stock/expense/day close; online booking; CRM consent and messaging; memberships/subscriptions and expiry.
-
-### Websites, ecommerce, AI, automation, and custom work
-
-Verify using a scope-specific acceptance checklist. Never convert a previous custom delivery into a reusable product claim without product-owner approval.
-
-## Runtime sales guardrail
-
-Only an immutable, published product-knowledge version may be used to draft customer-facing text. Retrieval must filter to `VERIFIED` and eligible `OPTIONAL` facts. `BETA`, `PLANNED`, `CUSTOM_REVIEW`, `UNSUPPORTED`, and `UNVERIFIED` facts must either be excluded or trigger an explicit human escalation. A product owner—not an LLM—publishes knowledge versions.
-
-## Immediate product-owner checklist
-
-1. Name the current production version of each product.
-2. Attach manuals, release notes, test environments, and known-issue lists.
-3. Demonstrate the minimum test packs above.
-4. Record supported deployment, hardware, migration, training, and support options.
-5. Approve packages, add-ons, prices, taxes, timelines, and prohibited claims.
-6. Sign and publish capability register version 1 before outbound sales begins.
-
+1. Run the source audit on the dimsum checkout: `npm run audit:source -- /path/to/dimsum`. It scans `app/**/route.ts`, pages, `migrations/*.sql`, tests and `AADHAR_RESTAURANT_PRODUCT_AUDIT.md`. It writes `reports/SOURCE_AUDIT.md` and `reports/source-audit.json`.
+   - A feature with routes, schema and tests gets a **PARTIAL proposal**. Routes alone stay UNKNOWN, because route existence is not proof.
+   - Multi-branch is re-proposed only if a real branch model appears and the audit no longer calls it future work.
+   - The tool never writes to the database.
+2. Configure the live demo URL. Run the health check (navigation verification), then build a script from that navigation (Demos → generated script). The script builder only includes verified, conditional or partial features that actually appear in the live navigation.
+3. An owner or product approver records evidence such as source path, test name and demo job ID, plus approved customer wording, in Settings → Feature claims. Every change is appended to history.
+4. From that moment the AI reply engine, the demo script builder and the LLM grounding facts use the new status automatically.

@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright-core";
@@ -8,7 +9,7 @@ config();
 
 const chrome =
   process.env.CHROME_PATH ??
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+  ["/opt/pw-browsers/chromium", "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"].find((path) => existsSync(path));
 const base = process.env.APP_ORIGIN ?? "http://localhost:3000";
 const browser = await chromium.launch({
   executablePath: chrome,
@@ -56,6 +57,17 @@ try {
     });
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Sales automation" }).click();
     await page.getByRole("heading", { name: "Sales automation settings" }).waitFor();
+    await page.getByText(/Tax status: PAN only/).waitFor();
+    await page.getByRole("heading", { name: "Company → Tax & Registration" }).waitFor();
+    await page.screenshot({ path: resolve(`.impeccable/review/company-${name}.png`), fullPage: true });
+    await page.getByRole("tab", { name: "Feature claims" }).click();
+    await page.getByText("Multi-branch operation").waitFor();
+    await page.screenshot({ path: resolve(`.impeccable/review/features-${name}.png`), fullPage: true });
+    await page.getByRole("tab", { name: "WhatsApp" }).click();
+    await page.getByRole("heading", { name: "WhatsApp channel" }).waitFor();
+    await page.getByRole("tab", { name: "Commercial catalogue" }).click();
+    await page.getByText(/OWNER_APPROVED_POSTER_2026\) are canonical/).waitFor();
+    await page.getByRole("tab", { name: "Demo applications" }).click();
     await page.getByText("No live demo will run until a target is checked and approved.").waitFor();
     await page.screenshot({ path: resolve(`.impeccable/review/automation-${name}.png`), fullPage: true });
     await page.getByRole("tab", { name: "Tax & sales limits" }).click();
@@ -64,6 +76,13 @@ try {
     await page.screenshot({ path: resolve(`.impeccable/review/policy-${name}.png`), fullPage: true });
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Priority inbox" }).click();
     await page.getByRole("heading", { name: "Priority inbox" }).waitFor();
+    await page.getByRole("button", { name: /^All/ }).click();
+    const momo = page.locator(".inbox-list-row", { hasText: "E2E Momo Cafe" }).first();
+    if (await momo.count()) {
+      await momo.click();
+      await page.getByText("Suggested reply", { exact: true }).waitFor();
+      await page.getByRole("textbox", { name: "Suggested reply" }).waitFor();
+    }
     await page.screenshot({ path: resolve(`.impeccable/review/inbox-${name}.png`), fullPage: true });
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Quotes & delivery" }).click();
     await page.getByRole("heading", { name: "Quotes & delivery" }).waitFor();

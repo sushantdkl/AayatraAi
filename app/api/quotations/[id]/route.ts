@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { rows, transaction } from "@/lib/db";
+import { recordTemperature } from "@/lib/temperature-store";
 import { ApiError, jsonError, requireActor, requireSameOrigin } from "@/lib/session";
 
 type Context = { params: Promise<{ id: string }> };
@@ -11,7 +12,7 @@ export async function GET(_request: Request, context: Context) {
     const id = z.uuid().parse((await context.params).id);
     const quote = await rows("SELECT id,quotation_number,status,current_version,accepted_version,accepted_at,acceptance_evidence,created_at FROM quotations WHERE id=$1 AND organization_id=$2", [id,actor.organization_id]);
     if (!quote[0]) throw new ApiError(404, "Quotation not found");
-    const versions = await rows("SELECT version,client_name,business_type,issued_at,valid_until,line_items,subtotal_minor,discount_minor,tax_minor,total_minor,currency,commercial_notes,scope,exclusions,payment_terms,commercial_policy_version,tax_mode,tax_rate_bps,created_at FROM quotation_versions WHERE quotation_id=$1 AND organization_id=$2 ORDER BY version DESC", [id,actor.organization_id]);
+    const versions = await rows("SELECT version,client_name,business_type,issued_at,valid_until,line_items,subtotal_minor,discount_minor,tax_minor,total_minor,currency,commercial_notes,scope,exclusions,payment_terms,commercial_policy_version,tax_mode,tax_rate_bps,company_snapshot,approval_reasons,created_at FROM quotation_versions WHERE quotation_id=$1 AND organization_id=$2 ORDER BY version DESC", [id,actor.organization_id]);
     return Response.json({ quotation: quote[0], versions });
   } catch (error) { return jsonError(error); }
 }
@@ -53,6 +54,10 @@ export async function PATCH(request: Request, context: Context) {
          acceptance_evidence=CASE WHEN $6 THEN $7 ELSE acceptance_evidence END,updated_at=now()
          WHERE id=$1 AND organization_id=$2`, [id,actor.organization_id,next,input.action === "APPROVE",actor.id,input.action === "ACCEPT",input.evidence],
       );
+      if (input.action === "MARK_SENT") {
+        const lead = await client.query<{ lead_id: string }>("SELECT o.lead_id FROM quotations q JOIN opportunities o ON o.id=q.opportunity_id AND o.organization_id=q.organization_id WHERE q.id=$1 AND q.organization_id=$2", [id,actor.organization_id]);
+        if (lead.rows[0]) await recordTemperature(client, { organizationId: actor.organization_id, leadId: lead.rows[0].lead_id, signalled: "PROPOSAL_SENT", cause: "Quotation marked sent", actorId: actor.id, systemEvent: true });
+      }
       await client.query(`INSERT INTO audit_events(organization_id,actor_id,action,entity_type,entity_id,after_value,reason) VALUES($1,$2,$3,'quotation',$4,$5,$6)`, [actor.organization_id,actor.id,`QUOTATION_${input.action}`,id,JSON.stringify({ status: next, version: current.rows[0].current_version }),input.evidence]);
       return { id, status: next, version: current.rows[0].current_version };
     });

@@ -1,7 +1,7 @@
 import { transaction } from "@/lib/db";
 import { marketingSnapshot } from "@/lib/marketing-snapshot";
 import { marketingDiscrepancies } from "@/lib/client-kit";
-import { jsonError, requireActor, requireSameOrigin } from "@/lib/session";
+import { ApiError, jsonError, requireActor, requireSameOrigin } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
@@ -13,6 +13,8 @@ export async function POST(request: Request) {
         [actor.organization_id, "Aayatra continuation prompt marketing snapshot 2026-10-01"],
       );
       if (existing.rowCount) return 0;
+      const poster = await client.query("SELECT 1 FROM commercial_items WHERE organization_id=$1 AND commercial_source='OWNER_APPROVED_POSTER_2026' LIMIT 1", [actor.organization_id]);
+      if (poster.rowCount) throw new ApiError(409, "Owner-approved poster prices are canonical; the older draft snapshot is not re-imported");
       for (const item of marketingSnapshot) {
         const created = await client.query<{ id: string }>(
           `INSERT INTO commercial_items(organization_id,product_family,kind,name,billing_type,billing_period,currency,source,notes,negotiable)

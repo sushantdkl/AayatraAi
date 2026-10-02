@@ -17,7 +17,7 @@ export async function PATCH(request: Request, context: Context) {
       );
       const item = existing.rows[0];
       if (!item) throw new ApiError(404, "Commercial item not found");
-      if (item.catalog_status === "RETIRED") throw new ApiError(409, "Retired items cannot be changed");
+      if (item.catalog_status === "RETIRED" || item.catalog_status === "SUPERSEDED") throw new ApiError(409, "Retired or superseded items cannot be changed; their history stays auditable");
       if (input.action === "ADD_PRICE") {
         await client.query(
           `INSERT INTO commercial_price_sources(organization_id,item_id,price_minor,source_name,evidence_reference,is_canonical)

@@ -15,9 +15,14 @@
     "test:e2e": "node tests/http-e2e.mjs",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:migrate:e2e": "tsx scripts/migrate.ts --e2e",
-    "db:bootstrap": "tsx scripts/bootstrap.ts"
+    "db:bootstrap": "tsx scripts/bootstrap.ts",
+    "db:apply-owner-config": "tsx scripts/apply-owner-config.ts",
+    "follow-up:worker": "tsx scripts/follow-up-worker.ts",
+    "audit:source": "tsx scripts/audit-source.ts",
+    "eval:ai": "tsx scripts/eval-ai.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "csv-parse": "^7.0.3",
     "dotenv": "^16.6.1",
     "lucide-react": "^0.468.0",

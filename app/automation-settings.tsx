@@ -5,6 +5,7 @@ import { CheckCircle2, CircleAlert, ExternalLink, Plus, ShieldCheck } from "luci
 import { productFamilies } from "@/lib/domain";
 import { allowedAutomationMode, automationFeatures, type AutomationFeature, type AutomationMode } from "@/lib/automation-controls";
 import CommercialPolicyEditor from "@/app/commercial-policy-editor";
+import { CompanyTaxPanel, FeatureClaimsPanel, WhatsAppPanel } from "@/app/owner-settings";
 import "@/app/automation-settings.css";
 import "@/app/automation-actions.css";
 import "@/app/automation-controls.css";
@@ -28,7 +29,7 @@ type Target = {
   last_verified_at: string | null;
   synthetic_data_evidence: string | null;
 };
-type PriceSource = { id: string; price_minor: string; source_name: string; is_canonical: boolean };
+type PriceSource = { id: string; price_minor: string; source_name: string; is_canonical: boolean; active: boolean };
 type Item = {
   id: string;
   product_family: string;
@@ -74,7 +75,7 @@ async function call<T>(path: string, method = "GET", body?: unknown): Promise<T>
 }
 
 export default function AutomationSettings({ role }: { role: string }) {
-  const [tab, setTab] = useState<"demo" | "commercial" | "policy" | "contacts" | "controls">("demo");
+  const [tab, setTab] = useState<"company" | "features" | "whatsapp" | "demo" | "commercial" | "policy" | "contacts" | "controls">("company");
   const [targets, setTargets] = useState<Target[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [settings, setSettings] = useState<Settings>({});
@@ -145,6 +146,9 @@ export default function AutomationSettings({ role }: { role: string }) {
 
   return <div className="automation-settings">
     <div className="automation-tabs" role="tablist" aria-label="Sales automation settings">
+      <button role="tab" aria-selected={tab === "company"} className={tab === "company" ? "active" : ""} onClick={() => setTab("company")}>Company &amp; tax</button>
+      <button role="tab" aria-selected={tab === "features"} className={tab === "features" ? "active" : ""} onClick={() => setTab("features")}>Feature claims</button>
+      <button role="tab" aria-selected={tab === "whatsapp"} className={tab === "whatsapp" ? "active" : ""} onClick={() => setTab("whatsapp")}>WhatsApp</button>
       <button role="tab" aria-selected={tab === "demo"} className={tab === "demo" ? "active" : ""} onClick={() => setTab("demo")}>Demo applications</button>
       <button role="tab" aria-selected={tab === "commercial"} className={tab === "commercial" ? "active" : ""} onClick={() => setTab("commercial")}>Commercial catalogue</button>
       <button role="tab" aria-selected={tab === "policy"} className={tab === "policy" ? "active" : ""} onClick={() => setTab("policy")}>Tax &amp; sales limits</button>
@@ -154,6 +158,9 @@ export default function AutomationSettings({ role }: { role: string }) {
     {error && <div className="alert error" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
 
+    {tab === "company" && <CompanyTaxPanel role={role} />}
+    {tab === "features" && <FeatureClaimsPanel role={role} />}
+    {tab === "whatsapp" && <WhatsAppPanel role={role} />}
     {tab === "demo" && <>
       <div className="automation-intro"><ShieldCheck size={19} /><div><strong>No live demo will run until a target is checked and approved.</strong><span>Only demo or staging environments with synthetic data should be configured. Passwords remain in secret storage; enter environment-variable names here.</span></div></div>
       <div className="automation-layout">
@@ -189,12 +196,12 @@ export default function AutomationSettings({ role }: { role: string }) {
     </>}
 
     {tab === "commercial" && <>
-      <div className="automation-intro warning"><CircleAlert size={19} /><div><strong>Marketing prices are drafts, not approved quotes.</strong><span>Verify every package, tax rule, hardware model, and price source. Conflicting active sources need a canonical decision.</span></div></div>
+      <div className="automation-intro"><CheckCircle2 size={19} /><div><strong>Owner-approved poster prices (OWNER_APPROVED_POSTER_2026) are canonical and quotable.</strong><span>Standard, undiscounted quotes are approved automatically. Discounts, custom work, non-standard hardware and any multi-branch promise need a person. Older draft prices stay below as superseded history.</span></div></div>
       <div className="automation-panel">
         <div className="automation-panel-head"><h2>Price and package register</h2>{role === "OWNER" && !items.length && <button className="button secondary" disabled={busy} onClick={() => void run(() => call("/api/commercial/seed-marketing", "POST", {}), "Marketing snapshot imported as drafts")}>Import marketing snapshot</button>}</div>
         {items.length ? <div className="commercial-list">{items.map((item) => <div className="commercial-row" key={item.id}>
           <div><strong>{item.name}</strong><small>{familyName(item.product_family)} · {item.kind.toLowerCase()} {item.billing_period ? `· per ${item.billing_period.toLowerCase()}` : "· one time"}</small></div>
-          <strong>{item.price_sources[0] ? money(item.price_sources[0].price_minor) : "No price"}</strong>
+          <strong>{(item.price_sources.find((source) => source.is_canonical && source.active) ?? item.price_sources[0]) ? money((item.price_sources.find((source) => source.is_canonical && source.active) ?? item.price_sources[0]).price_minor) : "No price"}</strong>
           <span className="automation-status">{item.catalog_status}</span>
           {role === "OWNER" && item.catalog_status === "DRAFT" && <div className="commercial-action"><input aria-label={`Evidence for ${item.name}`} placeholder="Product/price evidence reference" value={evidence[item.id] ?? ""} onChange={(event) => setEvidence({ ...evidence, [item.id]: event.target.value })} /><button className="button secondary" disabled={busy || (evidence[item.id] ?? "").trim().length < 8} onClick={() => void run(() => call(`/api/commercial/${item.id}`, "PATCH", { action: "VERIFY", evidenceReference: evidence[item.id] }), "Item verified; activation remains separate")}>Verify</button></div>}
           {role === "OWNER" && item.catalog_status === "VERIFIED" && <button className="button secondary" disabled={busy || item.discrepancies.some((entry) => entry.status === "OPEN")} onClick={() => void run(() => call(`/api/commercial/${item.id}`, "PATCH", { action: "ACTIVATE", approvalRequired: true }), "Item active with human quote approval required")}>Activate</button>}

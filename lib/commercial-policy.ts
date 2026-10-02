@@ -3,7 +3,7 @@ import { CommercialReviewRequired } from "@/lib/commercial";
 export type CommercialPolicySnapshot = {
   status: "DRAFT" | "APPROVED";
   version: number;
-  tax_mode: "UNCONFIGURED" | "EXEMPT" | "EXCLUSIVE";
+  tax_mode: "UNCONFIGURED" | "EXEMPT" | "EXCLUSIVE" | "PAN_ONLY";
   tax_rate_bps: number | null;
   max_manual_discount_bps: number;
 };
@@ -15,8 +15,12 @@ export function calculateQuoteAmounts(input: {
   floorTotalMinor: number | null;
   lineFloors?: Array<{ lineTotalMinor: number; floorMinor: number }>;
   policy: CommercialPolicySnapshot | null;
+  /** Company registration; VAT is never added unless the company is verified VAT-registered. */
+  companyTaxStatus?: "PAN_ONLY" | "VAT_REGISTERED" | null;
 }): { taxMinor: number; totalMinor: number; policyVersion: number | null; needsPolicyReview: boolean } {
-  const { subtotalMinor, discountMinor, submittedTaxMinor, floorTotalMinor, lineFloors, policy } = input;
+  const { subtotalMinor, discountMinor, submittedTaxMinor, floorTotalMinor, lineFloors, policy, companyTaxStatus } = input;
+  if (policy?.tax_mode === "EXCLUSIVE" && companyTaxStatus !== "VAT_REGISTERED")
+    throw new CommercialReviewRequired("VAT cannot be charged: company is not verified as VAT-registered");
   if (![subtotalMinor, discountMinor, submittedTaxMinor].every(Number.isSafeInteger) || subtotalMinor < 0 || discountMinor < 0 || submittedTaxMinor < 0)
     throw new CommercialReviewRequired("Quote amounts must be nonnegative safe minor-unit integers");
   if (discountMinor > subtotalMinor) throw new CommercialReviewRequired("Discount exceeds subtotal");

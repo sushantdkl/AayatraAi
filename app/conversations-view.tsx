@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowRight, MessageCircle, PauseCircle, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { ArrowRight, MessageCircle, PauseCircle, ShieldCheck, Sparkles, UserRoundCheck } from "lucide-react";
 import "@/app/conversations.css";
 import "@/app/conversations-mobile-fix.css";
 
@@ -12,12 +12,23 @@ type Conversation = {
   fit_score: number | null; lead_status: string; contact_name: string | null;
   contact_email: string | null; contact_phone: string | null;
   opportunity_stage: string | null; opportunity_value_minor: string | null;
-  latest_intent: string | null;
+  latest_intent: string | null; temperature: string; pending_drafts: number;
+  memory: { interest?: string[]; package?: string | null; billing?: string | null; objections?: string[]; nextAction?: string; language?: string } | null;
 };
+type Draft = { id: string; kind: string; intent: string; language: string; temperature: string; body: string; requires_human: boolean; escalation_reasons: string[]; citations: { skus: string[]; features: string[] }; next_actions: string[]; status: string; source: string; fallback_reason: string | null; created_at: string };
 type Message = { id: string; direction: string; body: string; created_at: string; provider: string | null };
 type LeadOption = { id: string; name: string };
-type Filter = "NEEDS_HUMAN" | "HOT" | "READY" | "UNREAD" | "ALL";
-const filters: Array<[Filter, string]> = [["NEEDS_HUMAN", "Needs human"], ["HOT", "Hot"], ["READY", "Ready to buy"], ["UNREAD", "Unread"], ["ALL", "All"]];
+type Filter = "PRIORITY" | "NEEDS_HUMAN" | "HOT" | "READY" | "NEGOTIATING" | "UNREAD" | "ALL";
+const filters: Array<[Filter, string]> = [["PRIORITY", "Priority"], ["READY", "Ready to buy"], ["HOT", "Hot"], ["NEGOTIATING", "Negotiating"], ["NEEDS_HUMAN", "Needs human"], ["UNREAD", "Unread"], ["ALL", "All"]];
+const hot = ["HOT", "READY_TO_BUY", "NEGOTIATING", "PROPOSAL_SENT", "PAYMENT_PENDING"];
+const matches = (conversation: Conversation, filter: Filter) =>
+  filter === "ALL" ? true :
+  filter === "PRIORITY" ? conversation.needs_human || hot.includes(conversation.temperature) || conversation.unread_count > 0 :
+  filter === "NEEDS_HUMAN" ? conversation.needs_human :
+  filter === "HOT" ? hot.includes(conversation.temperature) :
+  filter === "READY" ? ["READY_TO_BUY", "PAYMENT_PENDING"].includes(conversation.temperature) :
+  filter === "NEGOTIATING" ? conversation.temperature === "NEGOTIATING" :
+  conversation.unread_count > 0;
 const display = (value: string | null) => value ? value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : "Not recorded";
 const time = (value: string | null) => value ? new Date(value).toLocaleString("en-NP", { dateStyle: "medium", timeStyle: "short" }) : "No messages";
 
@@ -32,7 +43,10 @@ export default function ConversationsView({ leads, canWrite }: { leads: LeadOpti
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [filter, setFilter] = useState<Filter>("NEEDS_HUMAN");
+  const [filter, setFilter] = useState<Filter>("PRIORITY");
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [llm, setLlm] = useState(false);
+  const [edited, setEdited] = useState<string | null>(null);
   const [newLeadId, setNewLeadId] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
@@ -44,24 +58,26 @@ export default function ConversationsView({ leads, canWrite }: { leads: LeadOpti
     setSelectedId((current) => current ?? result.conversations[0]?.id ?? null);
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load inbox")), 0); return () => window.clearTimeout(timer); }, [refresh]);
+  const loadDrafts = useCallback(async (id: string) => {
+    const result = await call<{ drafts: Draft[]; llmEnabled: boolean }>(`/api/conversations/${id}/ai-drafts`);
+    setDrafts(result.drafts); setLlm(result.llmEnabled); setEdited(null);
+  }, []);
   useEffect(() => {
     if (!selectedId) return;
-    const timer = window.setTimeout(() => void call<{ messages: Message[] }>(`/api/conversations/${selectedId}/messages`).then((result) => setMessages(result.messages)).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load thread")), 0);
+    const timer = window.setTimeout(() => {
+      void call<{ messages: Message[] }>(`/api/conversations/${selectedId}/messages`).then((result) => setMessages(result.messages)).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load thread"));
+      void loadDrafts(selectedId).catch(() => setDrafts([]));
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [selectedId]);
+  }, [selectedId, loadDrafts]);
+  const suggestion = drafts.find((draft) => draft.status === "DRAFTED") ?? null;
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
-  const visible = useMemo(() => conversations.filter((conversation) => {
-    if (filter === "NEEDS_HUMAN") return conversation.needs_human;
-    if (filter === "HOT") return conversation.opportunity_stage === "HOT";
-    if (filter === "READY") return conversation.opportunity_stage === "READY" || conversation.latest_intent === "PURCHASE_INTENT";
-    if (filter === "UNREAD") return conversation.unread_count > 0;
-    return true;
-  }), [conversations, filter]);
+  const visible = useMemo(() => conversations.filter((conversation) => matches(conversation, filter)), [conversations, filter]);
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true); setError(""); setNotice("");
     try {
       await action(); await refresh();
-      if (selectedId) setMessages((await call<{ messages: Message[] }>(`/api/conversations/${selectedId}/messages`)).messages);
+      if (selectedId) { setMessages((await call<{ messages: Message[] }>(`/api/conversations/${selectedId}/messages`)).messages); await loadDrafts(selectedId); }
       setNotice(success);
       return true;
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Action failed"); return false; }
@@ -74,7 +90,7 @@ export default function ConversationsView({ leads, canWrite }: { leads: LeadOpti
   }
   return <div className="inbox-workspace">
     <div className="inbox-toolbar">
-      <div className="inbox-filters" role="group" aria-label="Conversation filters">{filters.map(([key, title]) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{title}<span>{conversations.filter((conversation) => key === "ALL" || key === "NEEDS_HUMAN" && conversation.needs_human || key === "HOT" && conversation.opportunity_stage === "HOT" || key === "READY" && (conversation.opportunity_stage === "READY" || conversation.latest_intent === "PURCHASE_INTENT") || key === "UNREAD" && conversation.unread_count > 0).length}</span></button>)}</div>
+      <div className="inbox-filters" role="group" aria-label="Conversation filters">{filters.map(([key, title]) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{title}<span>{conversations.filter((conversation) => matches(conversation, key)).length}</span></button>)}</div>
       {canWrite && <div className="inbox-create"><label className="sr-only" htmlFor="inbox-lead">Lead</label><select id="inbox-lead" value={newLeadId} onChange={(event) => setNewLeadId(event.target.value)}><option value="">Select lead for manual thread</option>{leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.name}</option>)}</select><button className="button secondary" disabled={busy || !newLeadId} onClick={() => void run(async () => { const result = await call<{ id: string }>("/api/conversations", "POST", { leadId: newLeadId, channel: "MANUAL" }); setSelectedId(result.id); }, "Manual conversation created")}>New thread</button></div>}
     </div>
     {error && <div className="alert error" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
@@ -82,7 +98,7 @@ export default function ConversationsView({ leads, canWrite }: { leads: LeadOpti
       <section className="inbox-list" aria-label="Conversations"><div className="inbox-pane-head"><h2>{filters.find(([key]) => key === filter)?.[1]}</h2><span>{visible.length}</span></div>
         {visible.length ? visible.map((conversation) => <button key={conversation.id} className={`inbox-list-row ${selectedId === conversation.id ? "selected" : ""}`} onClick={() => setSelectedId(conversation.id)}>
           <span className="inbox-list-top"><strong>{conversation.business_name}</strong>{conversation.unread_count > 0 && <em>{conversation.unread_count}</em>}</span>
-          <span>{display(conversation.latest_intent)} · {conversation.channel}</span>
+          <span><b className={`temp temp-${conversation.temperature.toLowerCase()}`}>{display(conversation.temperature)}</b> {display(conversation.latest_intent)} · {conversation.channel}{conversation.pending_drafts > 0 ? " · AI reply ready" : ""}</span>
           <small>{conversation.summary ?? "No messages yet"}</small>
         </button>) : <div className="inbox-empty"><MessageCircle size={22} /><strong>No conversations in this view</strong><span>Recorded incoming messages will appear here.</span></div>}
       </section>
@@ -90,12 +106,23 @@ export default function ConversationsView({ leads, canWrite }: { leads: LeadOpti
         {selected ? <><div className="inbox-pane-head"><div><h2>{selected.business_name}</h2><span>{display(selected.channel)} · {time(selected.last_message_at)}</span></div><span className="inbox-mode">{display(selected.control_mode)}</span></div>
           {canWrite && <div className="inbox-controls"><button className="button secondary" disabled={busy} onClick={() => void run(() => call(`/api/conversations/${selected.id}/control`, "POST", { action: "TAKE_OVER" }), "Human takeover recorded")}><UserRoundCheck size={15} /> Take over</button><button className="button secondary" disabled={busy} onClick={() => void run(() => call(`/api/conversations/${selected.id}/control`, "POST", { action: "PAUSE" }), "Conversation automation paused")}><PauseCircle size={15} /> Pause</button><button className="button secondary" disabled={busy} onClick={() => void run(() => call(`/api/conversations/${selected.id}/control`, "POST", { action: "MARK_READ" }), "Marked read")}>Mark read</button></div>}
           <div className="inbox-messages">{messages.length ? messages.map((message) => <div className={`inbox-message ${message.direction.toLowerCase()}`} key={message.id}><span>{display(message.direction)} · {time(message.created_at)}</span><p>{message.body}</p></div>) : <div className="inbox-empty"><MessageCircle size={22} /><strong>No messages recorded</strong><span>Use this thread for real contact, not simulated replies.</span></div>}</div>
+          {canWrite && <section className="ai-suggestion" aria-label="AI suggested reply">
+            <div className="ai-suggestion-head"><strong><Sparkles size={15} /> Suggested reply</strong>
+              <button className="button secondary" disabled={busy} onClick={() => void run(() => call(`/api/conversations/${selected.id}/ai-drafts`, "POST", {}), llm ? "New reply drafted with Claude (falls back to templates if a guardrail trips)" : "New reply drafted from approved templates")}>{llm ? "Redraft with AI" : "Redraft"}</button></div>
+            {suggestion ? <>
+              <div className="ai-tags"><span>{display(suggestion.intent)}</span><span>{display(suggestion.temperature)}</span><span>{suggestion.language === "NE" ? "नेपाली" : suggestion.language === "NE_ROMAN" ? "Romanized Nepali" : "English"}</span><span>{suggestion.source === "LLM" ? "Claude" : "Template"}</span>{suggestion.requires_human && <span className="warn">Needs a person</span>}</div>
+              <textarea aria-label="Suggested reply" value={edited ?? suggestion.body} onChange={(event) => setEdited(event.target.value)} rows={4} maxLength={4000} />
+              {suggestion.escalation_reasons.length > 0 && <ul className="ai-reasons">{suggestion.escalation_reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
+              {suggestion.citations.skus.length > 0 && <small>Prices from: {suggestion.citations.skus.join(", ")}</small>}
+              <div className="inbox-controls"><button className="button primary" disabled={busy} onClick={() => void run(() => call(`/api/ai-drafts/${suggestion.id}`, "PATCH", { action: "QUEUE_FOR_APPROVAL", body: edited ?? undefined }), "Reply queued for manager approval; delivery depends on the WhatsApp provider")}>Queue for approval</button><button className="button secondary" disabled={busy} onClick={() => void run(() => call(`/api/ai-drafts/${suggestion.id}`, "PATCH", { action: "DISCARD" }), "Suggestion discarded")}>Discard</button></div>
+            </> : <p className="ai-empty">No pending suggestion. Record the prospect&apos;s message or redraft.</p>}
+          </section>}
           {canWrite && <form className="inbox-compose" onSubmit={record}><label htmlFor="inbox-incoming">Record a real incoming message</label><textarea id="inbox-incoming" value={body} onChange={(event) => setBody(event.target.value)} minLength={1} maxLength={12000} placeholder="Paste or transcribe the prospect's actual words. Nothing is sent from here." required /><button className="button primary" disabled={busy || !body.trim()}>Record and triage <ArrowRight size={15} /></button></form>}
         </> : <div className="inbox-empty inbox-main-empty"><MessageCircle size={26} /><strong>Select a conversation</strong><span>Review the exact message and decide the next human action.</span></div>}
       </section>
-      <aside className="inbox-context" aria-label="Lead context">{selected ? <><div className="inbox-pane-head"><h2>Lead context</h2></div><div className="inbox-context-body"><div><span>Business</span><strong>{selected.business_name}</strong></div><div><span>Contact</span><strong>{selected.contact_name ?? selected.contact_email ?? selected.contact_phone ?? "Not linked"}</strong></div><div><span>Industry</span><strong>{display(selected.industry)}</strong></div><div><span>Lead fit</span><strong>{selected.fit_score == null ? "Unknown" : `${selected.fit_score}/100`}</strong></div><div><span>Pipeline stage</span><strong>{display(selected.opportunity_stage)}</strong></div><div><span>Latest intent</span><strong>{display(selected.latest_intent)}</strong></div><div><span>Human attention</span><strong>{selected.needs_human ? "Required" : "Not flagged"}</strong></div></div>
+      <aside className="inbox-context" aria-label="Lead context">{selected ? <><div className="inbox-pane-head"><h2>Lead context</h2></div><div className="inbox-context-body"><div><span>Business</span><strong>{selected.business_name}</strong></div><div><span>Contact</span><strong>{selected.contact_name ?? selected.contact_email ?? selected.contact_phone ?? "Not linked"}</strong></div><div><span>Industry</span><strong>{display(selected.industry)}</strong></div><div><span>Lead fit</span><strong>{selected.fit_score == null ? "Unknown" : `${selected.fit_score}/100`}</strong></div><div><span>Buying temperature</span><strong>{display(selected.temperature)}</strong></div><div><span>Pipeline stage</span><strong>{display(selected.opportunity_stage)}</strong></div>{selected.memory?.interest?.length ? <div><span>Interest</span><strong>{selected.memory.interest.map(display).join(", ")}</strong></div> : null}{selected.memory?.package ? <div><span>Package</span><strong>{display(selected.memory.package)}{selected.memory.billing ? ` · ${selected.memory.billing === "MONTH" ? "monthly" : "yearly"}` : ""}</strong></div> : null}{selected.memory?.objections?.length ? <div><span>Objections</span><strong>{selected.memory.objections.join(", ")}</strong></div> : null}{selected.memory?.nextAction ? <div><span>Next action</span><strong>{display(selected.memory.nextAction)}</strong></div> : null}<div><span>Latest intent</span><strong>{display(selected.latest_intent)}</strong></div><div><span>Human attention</span><strong>{selected.needs_human ? "Required" : "Not flagged"}</strong></div></div>
         </> : <div className="inbox-empty"><ShieldCheck size={23} /><strong>Evidence first</strong><span>Lead and intent details appear when you open a thread.</span></div>}</aside>
     </div>
-    <p className="inbox-disclaimer">Intent triage is rule-based and provisional. No AI reply, outbound message, or delivery is triggered by recording an inbound message.</p>
+    <p className="inbox-disclaimer">Suggested replies use only approved prices, verified feature claims and company facts. Nothing is sent until a manager approves it and a WhatsApp provider is configured.</p>
   </div>;
 }

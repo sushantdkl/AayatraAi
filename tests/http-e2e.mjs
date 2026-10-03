@@ -316,21 +316,119 @@ const floor = await request(`/api/commercial/${item.data.id}`, {
 });
 assert.equal(floor.response.status, 200, JSON.stringify(floor.data));
 const importedMarketing = await request("/api/commercial/seed-marketing", { method: "POST", cookie, body: {} });
-assert.equal(importedMarketing.response.status, 200, JSON.stringify(importedMarketing.data));
-const kitCatalog = await request("/api/commercial", { cookie });
-const enterpriseDraft = kitCatalog.data.items.find((value) => value.name === "Enterprise yearly" && value.source === "Aayatra continuation prompt marketing snapshot 2026-10-01");
-assert.ok(enterpriseDraft?.discrepancies.some((value) => value.code === "CLIENT_KIT_ENTERPRISE_YEARLY" && value.status === "OPEN"));
-assert.ok(kitCatalog.data.items.find((value) => value.name === "Thermal printer")?.discrepancies.some((value) => value.code === "CLIENT_KIT_THERMAL_PRINTER" && value.status === "OPEN"));
-if (enterpriseDraft.catalog_status === "DRAFT") {
-  const verifiedEnterprise = await request(`/api/commercial/${enterpriseDraft.id}`, {
-    method: "PATCH", cookie, body: { action: "VERIFY", evidenceReference: "Synthetic template comparison only" },
-  });
-  assert.equal(verifiedEnterprise.response.status, 200, JSON.stringify(verifiedEnterprise.data));
-}
-const blockedEnterprise = await request(`/api/commercial/${enterpriseDraft.id}`, {
-  method: "PATCH", cookie, body: { action: "ACTIVATE", approvalRequired: true },
+assert.equal(importedMarketing.response.status, 409, "owner-approved poster prices are canonical; old drafts are not re-imported");
+
+// ---- Owner-approved configuration addendum (2026-10-03) ----
+const company = await request("/api/company", { cookie });
+assert.equal(company.response.status, 200, JSON.stringify(company.data));
+assert.equal(company.data.profile.tax_status, "PAN_ONLY");
+assert.equal(company.data.profile.primary_whatsapp, "+977 9804573494");
+assert.equal(company.data.readiness.ready, false);
+const vatWithoutEvidence = await request("/api/commercial-policy", {
+  method: "PATCH", cookie, body: { action: "SAVE_DRAFT", taxMode: "EXCLUSIVE", taxRateBps: 1300, taxLabel: "VAT 13%", maxManualDiscountBps: 0, maxAutoDiscountBps: 0, maxNegotiationRounds: 0, maxMessagesPerContactPerDay: 0 },
 });
-assert.equal(blockedEnterprise.response.status, 409);
+assert.equal(vatWithoutEvidence.response.status, 409, "VAT must never be inferred from PAN registration");
+const posterCatalog = await request("/api/commercial", { cookie });
+const bySku = Object.fromEntries(posterCatalog.data.items.filter((value) => value.sku && value.catalog_status === "ACTIVE").map((value) => [value.sku, value]));
+for (const [sku, minor] of [["RESTAURANT_STARTER_YEARLY", 1500000], ["RESTAURANT_GROWTH_MONTHLY", 250000], ["RESTAURANT_ENTERPRISE_YEARLY", 4000000], ["RETAIL_ONE_TIME_SETUP", 3000000], ["RETAIL_MONTHLY", 100000], ["HW_THERMAL_PRINTER", 1400000], ["HW_THERMAL_LABEL_PRINTER", 2000000], ["HW_BARCODE_SCANNER", 800000]]) {
+  assert.ok(bySku[sku], `${sku} must be active`);
+  assert.equal(Number(bySku[sku].price_sources.find((source) => source.is_canonical).price_minor), minor, sku);
+  assert.equal(bySku[sku].discrepancies.filter((entry) => entry.status === "OPEN").length, 0);
+}
+const restaurantLead = await request("/api/leads", {
+  method: "POST", cookie,
+  body: { name: `E2E Momo Cafe ${suffix}`, industry: "RESTAURANT", city: "Kathmandu", sourceType: "MANUAL", sourceReference: "e2e authorized fixture", contactName: "Cafe Owner", contactPhone: "+977 9800000001", contactSource: "e2e authorized fixture" },
+});
+assert.equal(restaurantLead.response.status, 201, JSON.stringify(restaurantLead.data));
+const restaurantDetail = await request(`/api/leads/${restaurantLead.data.id}`, { cookie });
+const restaurantContact = restaurantDetail.data.contacts[0].id;
+await request(`/api/contacts/${restaurantContact}/eligibility`, { method: "POST", cookie, body: { eligible: true, evidence: "Synthetic e2e consent fixture" } });
+const restaurantOpportunity = await request("/api/opportunities", { method: "POST", cookie, body: { leadId: restaurantLead.data.id, title: "Aadhar POS Growth", productFamily: "RESTAURANT_SYSTEM" } });
+assert.equal(restaurantOpportunity.response.status, 201, JSON.stringify(restaurantOpportunity.data));
+const panQuote = await request("/api/quotations", {
+  method: "POST", cookie,
+  body: { opportunityId: restaurantOpportunity.data.id, items: [{ itemId: bySku.RESTAURANT_GROWTH_YEARLY.id, quantity: 1 }], validUntil: "2030-12-31", scope: "Aadhar POS Growth annual subscription", exclusions: "Hardware not included" },
+});
+assert.equal(panQuote.response.status, 201, JSON.stringify(panQuote.data));
+assert.equal(panQuote.data.status, "APPROVED", "standard undiscounted poster quote is auto-approved");
+assert.equal(panQuote.data.totalMinor, 2500000, "PAN-only: Growth NPR 25,000 has no VAT added");
+const panPrint = await (await fetch(`${base}/api/quotations/${panQuote.data.id}/print`, { headers: { Cookie: cookie } })).text();
+assert.match(panPrint, /Not separately charged under current PAN-only company configuration/);
+assert.match(panPrint, /Aayatra Enterprises/);
+assert.doesNotMatch(panPrint, /Tax Invoice/);
+const earlyInvoice = await fetch(`${base}/api/quotations/${panQuote.data.id}/print?kind=invoice`, { headers: { Cookie: cookie } });
+assert.equal(earlyInvoice.status, 409, "invoice requires an accepted quotation");
+const multiBranchQuote = await request("/api/quotations", {
+  method: "POST", cookie,
+  body: { opportunityId: restaurantOpportunity.data.id, items: [{ itemId: bySku.RESTAURANT_ENTERPRISE_YEARLY.id, quantity: 1 }], validUntil: "2030-12-31", scope: "Enterprise with three outlets", exclusions: "None", exceptions: ["MULTI_BRANCH_PROMISE"] },
+});
+assert.equal(multiBranchQuote.data.status, "REVIEW_REQUIRED");
+assert.ok(multiBranchQuote.data.approvalReasons.includes("MULTI_BRANCH_PROMISE"));
+const salesThread = await request("/api/conversations", { method: "POST", cookie, body: { leadId: restaurantLead.data.id, contactId: restaurantContact, channel: "WHATSAPP" } });
+const say = (body) => request(`/api/conversations/${salesThread.data.id}/messages`, { method: "POST", cookie, body: { direction: "INBOUND", body } });
+const priceAsk = await say("price kati ho?");
+assert.equal(priceAsk.data.intent, "PRICE_QUERY");
+assert.equal(priceAsk.data.temperature, "INTERESTED");
+assert.equal(priceAsk.data.language, "NE_ROMAN");
+let drafts = await request(`/api/conversations/${salesThread.data.id}/ai-drafts`, { cookie });
+assert.match(drafts.data.drafts[0].body, /NPR 15,000\/year/);
+assert.match(drafts.data.drafts[0].body, /NPR 40,000\/year/);
+const finalAsk = await say("Growth package final kati?");
+assert.equal(finalAsk.data.temperature, "NEGOTIATING");
+drafts = await request(`/api/conversations/${salesThread.data.id}/ai-drafts`, { cookie });
+assert.equal(drafts.data.drafts[0].requires_human, true);
+assert.doesNotMatch(drafts.data.drafts[0].body, /%/);
+const branchAsk = await say("Does Enterprise support multi branch?");
+drafts = await request(`/api/conversations/${salesThread.data.id}/ai-drafts`, { cookie });
+assert.match(drafts.data.drafts[0].body, /Multi-branch capability needs to be confirmed against the current deployment\/version/);
+assert.equal(branchAsk.data.needsHuman, true);
+await say("मूल्य कति हो?");
+drafts = await request(`/api/conversations/${salesThread.data.id}/ai-drafts`, { cookie });
+assert.equal(drafts.data.drafts[0].language, "NE");
+assert.match(drafts.data.drafts[0].body, /वर्ष/);
+const regenerated = await request(`/api/conversations/${salesThread.data.id}/ai-drafts`, { method: "POST", cookie, body: {} });
+assert.equal(regenerated.response.status, 201, JSON.stringify(regenerated.data));
+const queued = await request(`/api/ai-drafts/${regenerated.data.id}`, { method: "PATCH", cookie, body: { action: "QUEUE_FOR_APPROVAL" } });
+assert.equal(queued.response.status, 200, JSON.stringify(queued.data));
+const sentAttempt = await request(`/api/outbound/${queued.data.outboundMessageId}/approve`, { method: "POST", cookie, body: {} });
+assert.equal(sentAttempt.data.status, "BLOCKED_PROVIDER", "no WhatsApp credentials: nothing is represented as sent");
+const paymentAsk = await say("QR send garnu, proceed garam");
+assert.equal(paymentAsk.data.temperature, "PAYMENT_PENDING");
+const leadAfter = await request(`/api/leads/${restaurantLead.data.id}`, { cookie });
+assert.equal(leadAfter.response.status, 200);
+const features = await request("/api/features", { cookie });
+const multiBranch = features.data.features.find((feature) => feature.feature_key === "MULTI_BRANCH");
+assert.equal(multiBranch.implementation_status, "NOT_AVAILABLE");
+assert.equal(multiBranch.commercial_status, "NOT_SALES_SAFE");
+const posterClaim = await request(`/api/features/${multiBranch.id}`, { method: "PATCH", cookie, body: { implementationStatus: "VERIFIED_AVAILABLE", commercialStatus: "SELLABLE", evidence: "Enterprise poster 2026 says multi-branch", approvedLanguage: "Manage all branches" } });
+assert.equal(posterClaim.response.status, 409, "a poster can never verify a feature");
+const waSettings = await request("/api/whatsapp-settings", { method: "PATCH", cookie, body: { phoneNumberId: "100200300400", wabaId: "500600700800", accessTokenSecretRef: "WA_E2E_TOKEN_UNSET", appSecretRef: "WA_E2E_APP_SECRET", webhookVerifyTokenSecretRef: "WA_E2E_VERIFY_TOKEN" } });
+assert.equal(waSettings.response.status, 200, JSON.stringify(waSettings.data));
+assert.equal(waSettings.data.status.state, "NOT_CONFIGURED", "missing access token keeps production off");
+const challenge = await fetch(`${base}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(process.env.WA_E2E_VERIFY_TOKEN ?? "")}&hub.challenge=e2e-challenge`);
+assert.equal(await challenge.text(), "e2e-challenge");
+const { createHmac } = await import("node:crypto");
+const waFrom = `97798${String(Date.now()).slice(-8)}`;
+const waPayload = JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: { metadata: { phone_number_id: "100200300400" }, contacts: [{ wa_id: waFrom, profile: { name: "E2E Kirana" } }], messages: [{ from: waFrom, id: `wamid.e2e.${suffix}`, timestamp: "1760000000", type: "text", text: { body: "demo pathaunu, mero kirana pasal ko lagi" } }] } }] }] });
+const signed = (body, secret) => ({ "Content-Type": "application/json", "X-Hub-Signature-256": `sha256=${createHmac("sha256", secret).update(body).digest("hex")}` });
+const forged = await fetch(`${base}/api/webhooks/whatsapp`, { method: "POST", headers: signed(waPayload, "wrong-secret"), body: waPayload });
+assert.equal(forged.status, 401);
+const delivered = await (await fetch(`${base}/api/webhooks/whatsapp`, { method: "POST", headers: signed(waPayload, process.env.WA_E2E_APP_SECRET ?? ""), body: waPayload })).json();
+assert.equal(delivered.messages[0].intent, "DEMO_REQUEST");
+const redelivered = await (await fetch(`${base}/api/webhooks/whatsapp`, { method: "POST", headers: signed(waPayload, process.env.WA_E2E_APP_SECRET ?? ""), body: waPayload })).json();
+assert.equal(redelivered.messages[0].duplicate, true);
+const inbox = await request("/api/conversations", { cookie });
+const waThread = inbox.data.conversations.find((value) => value.business_name.startsWith("E2E Kirana"));
+assert.equal(waThread.temperature, "HOT");
+const inboundLead = (await request("/api/leads", { cookie })).data.leads.find((value) => value.name.startsWith("E2E Kirana") && value.name.includes(waFrom));
+assert.equal(inboundLead.source_type, "INBOUND_WHATSAPP", "inbound WhatsApp leads keep their source provenance");
+assert.equal(inbox.data.conversations[0].temperature, "PAYMENT_PENDING", "priority inbox puts payment-pending first");
+const analytics = await request("/api/analytics", { cookie });
+assert.equal(analytics.response.status, 200);
+assert.ok(analytics.data.funnel.find((row) => row.temperature === "PAYMENT_PENDING").count >= 1);
+const addendumLeads = 2;
+// ---- end addendum ----
+
 const draftPolicy = await request("/api/commercial-policy", {
   method: "PATCH", cookie, body: { action: "SAVE_DRAFT", taxMode: "EXEMPT", taxRateBps: 0, taxLabel: "Synthetic e2e no-tax fixture", maxManualDiscountBps: 1000, maxAutoDiscountBps: 0, maxNegotiationRounds: 0, maxMessagesPerContactPerDay: 0 },
 });
@@ -443,8 +541,8 @@ const blockedGoLive = await request(`/api/onboarding/${project.id}`, {
 assert.equal(blockedGoLive.response.status, 409);
 
 const overview = await request("/api/overview", { cookie });
-assert.equal(Number(overview.data.summary.leads), leadsBefore + 2);
+assert.equal(Number(overview.data.summary.leads), leadsBefore + 2 + addendumLeads);
 assert.equal(Number(overview.data.summary.qualified), qualifiedBefore + 1);
 console.log(
-  "HTTP E2E passed: CRM, inbox/outreach safety, demo placeholder, price conflict, quote, payment, close/onboarding gates and dashboard",
+  "HTTP E2E passed: CRM, inbox/outreach safety, demo placeholder, price conflict, owner config (PAN-only quote, poster prices, AI drafts EN/NE/Romanized, multi-branch guard, WhatsApp webhook), payment, close/onboarding gates and dashboard",
 );

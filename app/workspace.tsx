@@ -46,6 +46,7 @@ import ResearchPanel from "@/app/research-panel";
 import AutomationSettings from "@/app/automation-settings";
 import ConversationsView from "@/app/conversations-view";
 import CommercialLifecycle from "@/app/commercial-lifecycle";
+import FunnelPanel from "@/app/funnel-panel";
 
 type View =
   "overview" | "leads" | "campaigns" | "pipeline" | "inbox" | "lifecycle" | "knowledge" | "demos" | "automation";
@@ -145,7 +146,8 @@ const nav: Array<{ id: View; label: string; icon: typeof LayoutDashboard }> = [
   { id: "automation", label: "Sales automation", icon: Settings2 },
 ];
 
-function label(value: string): string {
+function label(value: string | null): string {
+  if (!value) return "Not recorded";
   return value
     .replaceAll("_", " ")
     .toLowerCase()
@@ -538,13 +540,14 @@ export default function Workspace({ actor }: { actor: Actor }) {
             </div>
           ) : (
             <>
-              {view === "overview" && (
+              {view === "overview" && (<>
                 <OverviewView
                   data={overview}
                   onOpenLead={openLead}
                   onViewLeads={() => setView("leads")}
                 />
-              )}
+                <FunnelPanel />
+              </>)}
               {view === "leads" &&
                 (selectedLead ? (
                   <LeadDetailView

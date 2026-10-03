@@ -1,3 +1,5 @@
+> **Superseded on 2026-10-03.** The owner configuration addendum confirmed company identity, PAN-only tax and canonical poster prices, and the remaining phases were implemented. Current status: [FINAL_IMPLEMENTATION_REPORT.md](FINAL_IMPLEMENTATION_REPORT.md). Remaining external items: [PRODUCTION_ACTIVATION_CHECKLIST.md](PRODUCTION_ACTIVATION_CHECKLIST.md). The text below is the 2026-10-02 snapshot, kept for history.
+
 # Implementation status — 2026-10-02
 
 This is the acceptance boundary for the [continuation prompt](AAYATRA_PENDING_SALES_AUTOMATION_IMPLEMENTATION_PROMPT.md), updated after reviewing the supplied [client kit](CLIENT_KIT_RECONCILIATION.md). Approval to continue does not supply missing product evidence, a demo URL, approved legal terms, consent policy, or provider credentials. No real external message, demo visit, payment, or AI response is claimed.

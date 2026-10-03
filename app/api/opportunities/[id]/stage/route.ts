@@ -3,6 +3,7 @@ import { rows, transaction } from "@/lib/db";
 import { canTransition, type Stage } from "@/lib/domain";
 import { canCloseWon, onboardingSteps } from "@/lib/closing";
 import { updateStageSchema } from "@/lib/schemas";
+import { recordTemperature } from "@/lib/temperature-store";
 import {
   ApiError,
   jsonError,
@@ -64,6 +65,7 @@ export async function POST(request: Request, context: Context) {
         "UPDATE opportunities SET stage=$3,updated_at=now() WHERE id=$1 AND organization_id=$2",
         [id, actor.organization_id, input.stage],
       );
+      if (input.stage === "WON") await recordTemperature(client, { organizationId: actor.organization_id, leadId: current.rows[0].lead_id, signalled: "CLOSED_WON", cause: "Opportunity closed as WON", actorId: actor.id, systemEvent: true });
       await client.query(
         `INSERT INTO stage_history(organization_id,opportunity_id,from_stage,to_stage,reason,actor_id)
          VALUES($1,$2,$3,$4,$5,$6)`,

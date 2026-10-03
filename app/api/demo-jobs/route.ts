@@ -31,8 +31,9 @@ export async function POST(request: Request) {
         if (!lead.rowCount) throw new ApiError(404, "Lead not found");
       }
       const ready = Boolean(target.rows[0].base_url && target.rows[0].enabled && ["READY_FOR_TEST", "HEALTHY"].includes(target.rows[0].status));
-      const executable = input.jobType === "HEALTH_CHECK" && ready;
-      const failureReason = !ready ? "WAITING_FOR_DEMO_URL_OR_REVIEW" : input.jobType !== "HEALTH_CHECK" ? "SCRIPT_OR_VIDEO_WORKER_NOT_ENABLED" : null;
+      const needsScript = input.jobType !== "HEALTH_CHECK" && !input.scriptId;
+      const executable = ready && !needsScript;
+      const failureReason = !ready ? "WAITING_FOR_DEMO_URL_OR_REVIEW" : needsScript ? "REVIEWED_SCRIPT_REQUIRED" : null;
       const created = await client.query<{ id: string }>(
         `INSERT INTO demo_jobs(organization_id,lead_id,target_id,script_id,status,job_type,failure_reason,created_by)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
